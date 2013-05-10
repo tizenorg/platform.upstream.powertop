@@ -1,9 +1,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = -I ../m4 
 
-noinst_PROGRAMS = csstoh
-csstoh_SOURCES = csstoh.c 
-
 sbin_PROGRAMS = powertop
 nodist_powertop_SOURCES = css.h
 
@@ -11,10 +8,10 @@ powertop_SOURCES = parameters/persistent.cpp parameters/learn.cpp parameters/par
 		parameters/parameters.h display.cpp cpu/cpu_core.cpp cpu/cpudevice.cpp  \
 		cpu/cpu.cpp cpu/cpu.h cpu/cpu_linux.cpp cpu/abstract_cpu.cpp cpu/intel_cpus.h \
 		cpu/cpu_package.cpp cpu/cpudevice.h cpu/intel_cpus.cpp devlist.h devlist.cpp \
-		lib.cpp report.cpp process/process.cpp process/interrupt.h process/timer.h  \
+		lib.cpp report/report.cpp process/process.cpp process/interrupt.h process/timer.h  \
 		process/processdevice.cpp process/powerconsumer.cpp process/work.h \
 		process/timer.cpp process/process.h process/work.cpp process/do_process.cpp \
-		process/processdevice.h process/interrupt.cpp process/powerconsumer.h report.h \
+		process/processdevice.h process/interrupt.cpp process/powerconsumer.h report/report.h \
 		perf/perf.cpp perf/perf_event.h perf/perf.h perf/perf_bundle.h perf/perf_bundle.cpp \
 		display.h devices/rfkill.h devices/i915-gpu.cpp devices/device.cpp devices/alsa.cpp \
 		devices/runtime_pm.cpp devices/thinkpad-fan.cpp devices/usb.cpp devices/ahci.cpp \
@@ -30,6 +27,10 @@ powertop_SOURCES = parameters/persistent.cpp parameters/learn.cpp parameters/par
 		calibrate/calibrate.h measurement/measurement.cpp measurement/power_supply.cpp \
 		measurement/measurement.h measurement/acpi.cpp measurement/sysfs.h measurement/sysfs.cpp \
 		measurement/acpi.h measurement/extech.cpp measurement/power_supply.h measurement/extech.h \
+		report/report-maker.cpp report/report-maker.h report/report-formatter.h \
+		report/report-formatter-base.cpp report/report-formatter-base.h \
+		report/report-formatter-csv.cpp report/report-formatter-csv.h \
+		report/report-formatter-html.cpp report/report-formatter-html.h \
 		main.cpp css.h powertop.css cpu/intel_gpu.cpp
 
 
@@ -44,6 +45,6 @@ AM_LDFLAGS = $(LIBS) $(NCURSES_LIBS) $(PCIUTILS_LIBS) $(LIBNL_LIBS) $(LIBZ_LIBS)
 
 BUILT_SOURCES = css.h
 CLEANFILES = css.h
-css.h: csstoh powertop.css
-	./csstoh "$(srcdir)"/powertop.css css.h
+css.h: powertop.css
+	$(SHELL) ./csstoh.sh powertop.css css.h
 

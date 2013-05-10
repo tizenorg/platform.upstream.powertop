@@ -25,9 +25,7 @@
 #ifndef INCLUDE_GUARD_LIB_H
 #define INCLUDE_GUARD_LIB_H
 
-#ifndef DISABLE_I18N
 #include <libintl.h>
-#endif
 #include <stdint.h>
 
 /* Include only for Automake builds */
@@ -35,15 +33,12 @@
 #include "config.h"
 #endif
 
-#ifndef DISABLE_I18N
 #define _(STRING)    gettext(STRING)
-#else
-#define _(STRING)    (STRING)
-#endif
 
-#define POWERTOP_VERSION "v2.1"
-#define POWERTOP_SHORT_VERSION "2.1"
+#define POWERTOP_VERSION "v"PACKAGE_VERSION
+#define POWERTOP_SHORT_VERSION PACKAGE_VERSION
 
+extern int is_turbo(uint64_t freq, uint64_t max, uint64_t maxmo);
 
 extern int get_max_cpu(void);
 extern void set_max_cpu(int cpu);

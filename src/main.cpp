@@ -56,7 +56,7 @@
 
 #include "display.h"
 #include "devlist.h"
-#include "report.h"
+#include "report/report.h"
 
 #define DEBUGFS_MAGIC          0x64626720
 
@@ -77,7 +77,7 @@ static const struct option long_options[] =
 	{"time", optional_argument, NULL, 't'},
 	{"iteration", optional_argument, NULL, 'i'},
 	{"workload", optional_argument, NULL, 'w'},
-	{"quite", optional_argument, NULL, 'q'},
+	{"quiet", no_argument, NULL, 'q'},
 	{NULL, 0, NULL, 0}
 };
 
@@ -112,7 +112,7 @@ static void print_usage()
 	printf("--time%s \t %s\n",_("[=seconds]"), _("generate a report for 'x' seconds"));
 	printf("--iteration%s\n", _("[=iterations] number of times to run each test"));
 	printf("--workload%s \t %s\n", _("[=workload]"), _("file to execute for workload"));
-	printf("--quite \t %s\n", _("supress stderr output"));
+	printf("--quiet \t\t %s\n", _("suppress stderr output"));
 	printf("--help \t\t\t %s\n",_("print this help menu"));
 	printf("\n");
 	printf("%s\n\n",_("For more help please refer to the README"));
@@ -127,7 +127,6 @@ static void do_sleep(int seconds)
 		sleep(seconds);
 		return;
 	}
-#ifndef DISABLE_NCURSES
 	target = time(NULL) + seconds;
 	delta = seconds;
 	do {
@@ -136,22 +135,28 @@ static void do_sleep(int seconds)
 		halfdelay(delta * 10);
 
 		c = getch();
-
 		switch (c) {
-		case KEY_NPAGE:
-		case KEY_RIGHT:
-			show_next_tab();
-			break;
-		case KEY_PPAGE:
-		case KEY_LEFT:
+		case 353: 
 			show_prev_tab();
 			break;
+		case 9:
+			show_next_tab(); 
+			break;
+		case KEY_RIGHT:
+			cursor_right(); 
+			break;
+		case KEY_LEFT:
+			cursor_left(); 
+			break;
+		case KEY_NPAGE:
 		case KEY_DOWN:
 			cursor_down();
 			break;
+		case KEY_PPAGE:
 		case KEY_UP:
 			cursor_up();
 			break;
+		case 32:
 		case 10:
 			cursor_enter();
 			break;
@@ -174,7 +179,6 @@ static void do_sleep(int seconds)
 			break;
 
 	} while (1);
-#endif
 }
 
 
@@ -187,7 +191,8 @@ void one_measurement(int seconds, char *workload)
 	start_cpu_measurement();
 
 	if (workload && workload[0]) {
-		system(workload);
+		if (system(workload))
+			fprintf(stderr, _("Unknown issue running workload!\n"));
 	} else {
 		do_sleep(seconds);
 	}
@@ -232,14 +237,14 @@ void out_of_memory()
 	abort();
 }
 
-void report(int time, char *workload, int iterations, char *file)
+void make_report(int time, char *workload, int iterations, char *file)
 {
 
 	/* one to warm up everything */
 	fprintf(stderr, _("Preparing to take measurements\n"));
 	utf_ok = 0;
 	one_measurement(1, NULL);
-	
+
 	if (!workload[0])
 	  fprintf(stderr, _("Taking %d measurement(s) for a duration of %d second(s) each.\n"),iterations,time);
 	else
@@ -262,7 +267,7 @@ void report(int time, char *workload, int iterations, char *file)
 }
 
 static void checkroot() {
-	int uid; 
+	int uid;
 	uid = getuid();
 
 	if (uid != 0) {
@@ -270,7 +275,7 @@ static void checkroot() {
 		printf(_("exiting...\n"));
 		exit(EXIT_FAILURE);
 	}
-	
+
 }
 
 static void powertop_init(void)
@@ -282,7 +287,7 @@ static void powertop_init(void)
 	if (initialized)
 		return;
 
-	checkroot(); 
+	checkroot();
 	ret = system("/sbin/modprobe cpufreq_stats > /dev/null 2>&1");
 	ret = system("/sbin/modprobe msr > /dev/null 2>&1");
 	statfs("/sys/kernel/debug", &st_fs);
@@ -322,8 +327,7 @@ static void powertop_init(void)
 	register_parameter("disk-operations", 0.0);
 	register_parameter("xwakes", 0.1);
 
-        if (access("/var/cache/powertop/saved_parameters.powertop", R_OK))
-	        load_parameters("/var/cache/powertop/saved_parameters.powertop");
+        load_parameters("saved_parameters.powertop");
 
 	initialized = 1;
 }
@@ -333,23 +337,18 @@ int main(int argc, char **argv)
 {
 	int option_index;
 	int c;
-	bool wantreport = false;
 	char filename[4096];
 	char workload[4096] = {0,};
 	int  iterations = 1;
 
-#ifndef DISABLE_TRYCATCH
 	set_new_handler(out_of_memory);
-#endif
 
 	setlocale (LC_ALL, "");
-#ifndef DISABLE_I18N
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
-#endif
 
 	while (1) { /* parse commandline options */
-		c = getopt_long (argc, argv, "ch:C:i:t:uV:w:q", long_options, &option_index);
+		c = getopt_long (argc, argv, "ch:C:i:t:uVw:q", long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -361,7 +360,7 @@ int main(int argc, char **argv)
 				break;
 
 			case 'e': /* Extech power analyzer support */
-				checkroot(); 
+				checkroot();
 				extech_power_meter(optarg ? optarg : "/dev/ttyUSB0");
 				break;
 			case 'u':
@@ -375,9 +374,8 @@ int main(int argc, char **argv)
 				break;
 
 			case 'h': /* html report */
-				wantreport = true;
-				reporttype = 1;
-				sprintf(filename, "%s", optarg ? optarg : "PowerTOP.html" );
+				reporttype = REPORT_HTML;
+				sprintf(filename, "%s", optarg ? optarg : "powertop.html" );
 				break;
 
 			case 't':
@@ -392,13 +390,13 @@ int main(int argc, char **argv)
 				sprintf(workload, "%s", optarg ? optarg :'\0' );
 				break;
 			case 'q':
-				freopen("/dev/null", "a", stderr);
+				if(freopen("/dev/null", "a", stderr))
+					fprintf(stderr, _("Quite mode failed!\n"));
 				break;
-				
+
 			case 'C': /* csv report*/
-				wantreport = true;
-				reporttype = 0;
-				sprintf(filename, "%s", optarg ? optarg : "PowerTOP.csv");
+				reporttype = REPORT_CSV;
+				sprintf(filename, "%s", optarg ? optarg : "powertop.csv");
 				break;
 			case '?': /* Unknown option */
 				/* getopt_long already printed an error message. */
@@ -409,8 +407,8 @@ int main(int argc, char **argv)
 
 	powertop_init();
 
-	if (wantreport)
-		report(time_out, workload, iterations, filename);
+	if (reporttype != REPORT_OFF)
+		make_report(time_out, workload, iterations, filename);
 
 	if (debug_learning)
 		printf("Learning debugging enabled\n");
@@ -438,9 +436,7 @@ int main(int argc, char **argv)
 		one_measurement(time_out, NULL);
 		learn_parameters(15, 0);
 	}
-#ifndef DISABLE_NCURSES
 	endwin();
-#endif
 	printf("%s\n", _("Leaving PowerTOP"));
 
 	end_process_data();

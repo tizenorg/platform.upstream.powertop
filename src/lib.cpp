@@ -52,14 +52,21 @@ extern "C" {
 #include <sys/stat.h>
 #include <dirent.h>
 #include <locale.h>
-#ifndef DISABLE_I18N
 #include <libintl.h>
-#endif
 #include <limits>
 #include <math.h>
 #include <ncurses.h>
 
 static int kallsyms_read = 0;
+
+int is_turbo(uint64_t freq, uint64_t max, uint64_t maxmo)
+{
+	if (freq != max)
+		return 0;
+	if (maxmo + 1000 != max)
+		return 0;
+	return 1;
+}
 
 double percentage(double F)
 {
@@ -166,7 +173,7 @@ void write_sysfs(const string &filename, const string &value)
 	file.open(filename.c_str(), ios::out);
 	if (!file)
 		return;
-	try 
+	try
 	{
 		file << value;
 		file.close();
@@ -261,10 +268,8 @@ void format_watts(double W, char *buffer, unsigned int len)
 	if (W < 0.0001)
 		sprintf(buffer, _("    0 mW"));
 
-#ifndef DISABLE_NCURSES
 	while (mbstowcs(NULL,buffer,0) < len)
 		strcat(buffer, " ");
-#endif
 }
 
 

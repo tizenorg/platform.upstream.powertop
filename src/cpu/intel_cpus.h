@@ -25,6 +25,8 @@
 #include <stdint.h>
 #include <sys/time.h>
 
+#include "cpu.h"
+
 
 #define MSR_TSC				0x10
 #define MSR_NEHALEM_PLATFORM_INFO	0xCE
@@ -51,19 +53,12 @@ private:
 
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
-
-	void		account_freq(uint64_t frequency, uint64_t duration);
-
 public:
 	virtual void	measurement_start(void);
 	virtual void	measurement_end(void);
 	virtual int     can_collapse(void) { return 0;};
 
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
-
-	virtual void    calculate_freq(uint64_t time);
-	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
-
 };
 
 class nhm_core: public cpu_core
@@ -76,18 +71,12 @@ private:
 
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
-
-	void		account_freq(uint64_t frequency, uint64_t duration);
 public:
 	virtual void	measurement_start(void);
 	virtual void	measurement_end(void);
 	virtual int     can_collapse(void) { return 0;};
 
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
-
-	virtual void    calculate_freq(uint64_t time);
-	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
-
 };
 
 class nhm_cpu: public cpu_linux
@@ -101,8 +90,6 @@ private:
 
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
-
-	void		account_freq(uint64_t frequency, uint64_t duration);
 public:
 	virtual void	measurement_start(void);
 	virtual void	measurement_end(void);
@@ -111,12 +98,6 @@ public:
 	virtual char *  fill_pstate_name(int line_nr, char *buffer);
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
 	virtual int	has_pstate_level(int level);
-
-	virtual void    change_freq(uint64_t time, int freq);
-	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
-	virtual void    go_idle(uint64_t time);
-	virtual void    go_unidle(uint64_t time);
-
 };
 
 class atom_package: public cpu_package
@@ -158,5 +139,6 @@ public:
 	virtual char *  fill_cstate_line(int line_nr, char *buffer, const char *separator);
 	virtual int	has_pstate_level(int level) { return 0; };
 	virtual int	has_pstates(void) { return 0; };
+	virtual void	wiggle(void) { };
 
 };

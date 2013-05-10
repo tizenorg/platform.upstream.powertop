@@ -28,7 +28,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "cpu.h"
+#include "../lib.h"
 
+void abstract_cpu::account_freq(uint64_t freq, uint64_t duration)
+{
+	struct frequency *state = NULL;
+	unsigned int i;
+
+	for (i = 0; i < pstates.size(); i++) {
+		if (freq == pstates[i]->freq) {
+			state = pstates[i];
+			break;
+		}
+	}
+
+
+	if (!state) {
+		state = new(std::nothrow) struct frequency;
+
+		if (!state)
+			return;
+
+		memset(state, 0, sizeof(*state));
+
+		pstates.push_back(state);
+
+		state->freq = freq;
+		hz_to_human(freq, state->human_name);
+		if (freq == 0)
+			strcpy(state->human_name, _("Idle"));
+		if (is_turbo(freq, max_frequency, max_minus_one_frequency))
+			sprintf(state->human_name, _("Turbo Mode"));
+
+		state->after_count = 1;
+	}
+
+
+	state->time_after += duration;
+
+
+}
+
+void abstract_cpu::freq_updated(uint64_t time)
+{
+	if(parent)
+		parent->calculate_freq(time);
+	old_idle = idle;
+}
 
 void abstract_cpu::measurement_start(void)
 {
@@ -162,7 +208,7 @@ void abstract_cpu::insert_cstate(const char *linux_name, const char *human_name,
 		c++;
 	}
 
-	/* some architectures (ARM) don't have good numbers in thier human name.. fall back to the linux name for those */
+	/* some architectures (ARM) don't have good numbers in their human name.. fall back to the linux name for those */
 	c = linux_name;
 	while (*c && state->line_level < 0) {
 		if (*c >= '0' && *c <='9') {
@@ -334,34 +380,45 @@ void abstract_cpu::calculate_freq(uint64_t time)
 
 	/* calculate the maximum frequency of all children */
 	for (i = 0; i < children.size(); i++)
-		if (children[i]) {
+		if (children[i] && children[i]->has_pstates()) {
 			uint64_t f = 0;
 			if (!children[i]->idle) {
 				f = children[i]->current_frequency;
 				is_idle = false;
 			}
 			if (f > freq)
-				f = freq;
+				freq = f;
 		}
 
 	current_frequency = freq;
 	idle = is_idle;
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
+	freq_updated(time);
 }
 
 void abstract_cpu::change_effective_frequency(uint64_t time, uint64_t frequency)
 {
 	unsigned int i;
+	uint64_t time_delta, fr;
+
+	if (last_stamp)
+		time_delta = time - last_stamp;
+	else
+		time_delta = 1;
+
+	fr = effective_frequency;
+	if (old_idle)
+		fr = 0;
+
+	account_freq(fr, time_delta);
+
+	effective_frequency = frequency;
+	last_stamp = time;
 
 	/* propagate to all children */
 	for (i = 0; i < children.size(); i++)
 		if (children[i]) {
 			children[i]->change_effective_frequency(time, frequency);
 		}
-
-	effective_frequency = frequency;
 }
 
 
@@ -414,21 +471,10 @@ uint64_t abstract_cpu::total_pstate_time(void)
 void abstract_cpu::validate(void)
 {
 	unsigned int i;
-	uint64_t my_time;
-
-	my_time = total_pstate_time();
 
 	for (i = 0; i < children.size(); i++) {
-
-		if (children[i]) {
-			if (my_time != children[i]->total_pstate_time())
-				printf("My (%i) time %llu is not the same as child (%i) time %llu\n",
-					first_cpu,
-					(unsigned long long)my_time,
-					children[i]->number,
-					(unsigned long long)children[i]->total_pstate_time());
+		if (children[i])
 			children[i]->validate();
-		}
 	}
 }
 
