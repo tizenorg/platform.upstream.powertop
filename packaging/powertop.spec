@@ -1,5 +1,5 @@
 Name:           powertop
-Version:        2.1
+Version:        2.3
 Release:        1
 License:        GPL-2.0
 Summary:        PowerTop is tool that is used for power diagnostics
@@ -40,6 +40,6 @@ make %{?_smp_mflags}
 
 %files
 %defattr(-,root,root,-)
-%doc COPYING
+%license COPYING
 %{_sbindir}/powertop
 %{_mandir}/man8/powertop.8.gz
