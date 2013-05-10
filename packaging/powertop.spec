@@ -4,7 +4,7 @@ Release:        1
 License:        GPL-2.0
 Summary:        PowerTop is tool that is used for power diagnostics
 Url:            http://www.01.org
-Group:          Applications/System
+Group:          Platform Development/Tools
 Source0:        https://01.org/powertop/sites/default/files/downloads/%{name}-%{version}.tar.gz
 
 BuildRequires:  gettext
