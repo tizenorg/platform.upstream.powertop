@@ -6,6 +6,7 @@ Summary:        PowerTop is tool that is used for power diagnostics
 Url:            http://www.01.org
 Group:          Platform Development/Tools
 Source0:        https://01.org/powertop/sites/default/files/downloads/%{name}-%{version}.tar.gz
+Source1001: 	powertop.manifest
 
 BuildRequires:  gettext
 BuildRequires:  zlib-devel
@@ -25,6 +26,7 @@ laptop.
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 
 %build
 
@@ -39,6 +41,7 @@ make %{?_smp_mflags}
 %lang_package
 
 %files
+%manifest %{name}.manifest
 %defattr(-,root,root,-)
 %license COPYING
 %{_sbindir}/powertop
