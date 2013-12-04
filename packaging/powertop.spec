@@ -1,5 +1,5 @@
 Name:           powertop
-Version:        2.3
+Version:        2.5
 Release:        1
 License:        GPL-2.0
 Summary:        A tool that is used for power diagnostics
