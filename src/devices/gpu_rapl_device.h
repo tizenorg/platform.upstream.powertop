@@ -20,39 +20,38 @@
  * or just google for it.
  *
  * Authors:
- *	Arjan van de Ven <arjan@linux.intel.com>
+ *	Srinivas Pandruvada <Srinivas.Pandruvada@linux.intel.com>
  */
-#ifndef _INCLUDE_GUARD_BACKLIGHT_H
-#define _INCLUDE_GUARD_BACKLIGHT_H
+#ifndef _INCLUDE_GUARD_GPU_RAPL_DEVICE_H
+#define _INCLUDE_GUARD_GPU_RAPL_DEVICE_H
 
+#include <vector>
+#include <string>
 
-#include "device.h"
+using namespace std;
 
-class backlight: public device {
-	int min_level, max_level;
-	int start_level, end_level;
-	char sysfs_path[4096];
-	char name[4096];
-	int r_index;
-	int r_index_power;
+#include <sys/time.h>
+#include "i915-gpu.h"
+#include "cpu/rapl/rapl_interface.h"
+
+class gpu_rapl_device: public i915gpu {
+
+	c_rapl_interface rapl;
+	time_t		last_time;
+	double		last_energy;
+	double 		consumed_power;
+	bool		device_valid;
+
 public:
-
-	backlight(const char *_name, const char *path);
-
+	gpu_rapl_device(i915gpu *parent);
+	virtual const char * class_name(void) { return "GPU core";};
+	virtual const char * device_name(void) { return "GPU core";};
+	bool device_present() { return device_valid;}
+	virtual double power_usage(struct result_bundle *result, struct parameter_bundle *bundle);
 	virtual void start_measurement(void);
 	virtual void end_measurement(void);
 
-	virtual double	utilization(void); /* percentage */
-
-	virtual const char * class_name(void) { return "backlight";};
-
-	virtual const char * device_name(void);
-	virtual const char * human_name(void) { return "Display backlight";};
-	virtual double power_usage(struct result_bundle *result, struct parameter_bundle *bundle);
-	virtual int grouping_prio(void) { return 10; };
 };
-
-extern void create_all_backlights(void);
 
 
 #endif

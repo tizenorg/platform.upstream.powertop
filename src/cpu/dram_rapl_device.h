@@ -20,39 +20,38 @@
  * or just google for it.
  *
  * Authors:
- *	Arjan van de Ven <arjan@linux.intel.com>
+ *	Srinivas Pandruvada <Srinivas.Pandruvada@linux.intel.com>
  */
-#ifndef _INCLUDE_GUARD_BACKLIGHT_H
-#define _INCLUDE_GUARD_BACKLIGHT_H
+#ifndef _INCLUDE_GUARD_DRAM_RAPL_DEVICE_H
+#define _INCLUDE_GUARD_DRAM_RAPL_DEVICE_H
 
+#include <vector>
+#include <string>
 
-#include "device.h"
+using namespace std;
 
-class backlight: public device {
-	int min_level, max_level;
-	int start_level, end_level;
-	char sysfs_path[4096];
-	char name[4096];
-	int r_index;
-	int r_index_power;
+#include <sys/time.h>
+#include "cpudevice.h"
+#include "rapl/rapl_interface.h"
+
+class dram_rapl_device: public cpudevice {
+
+	c_rapl_interface *rapl;
+	time_t		last_time;
+	double		last_energy;
+	double 		consumed_power;
+	bool		device_valid;
+
 public:
-
-	backlight(const char *_name, const char *path);
-
-	virtual void start_measurement(void);
-	virtual void end_measurement(void);
-
-	virtual double	utilization(void); /* percentage */
-
-	virtual const char * class_name(void) { return "backlight";};
-
-	virtual const char * device_name(void);
-	virtual const char * human_name(void) { return "Display backlight";};
+	dram_rapl_device(cpudevice *parent, const char *classname = "dram_core", const char *device_name = "dram_core", class abstract_cpu *_cpu = NULL);
+	~dram_rapl_device() { delete rapl; }
+	virtual const char * device_name(void) {return "DRAM";};
+	bool device_present() { return device_valid;}
 	virtual double power_usage(struct result_bundle *result, struct parameter_bundle *bundle);
-	virtual int grouping_prio(void) { return 10; };
-};
+	void start_measurement(void);
+	void end_measurement(void);
 
-extern void create_all_backlights(void);
+};
 
 
 #endif

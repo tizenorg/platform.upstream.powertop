@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include "cpu.h"
 #include "cpudevice.h"
+#include "cpu_rapl_device.h"
+#include "dram_rapl_device.h"
 #include "intel_cpus.h"
 #include "../parameters/parameters.h"
 
@@ -59,30 +61,14 @@ static class abstract_cpu * new_package(int package, int cpu, char * vendor, int
 {
 	class abstract_cpu *ret = NULL;
 	class cpudevice *cpudev;
+	class cpu_rapl_device *cpu_rapl_dev;
+	class dram_rapl_device *dram_rapl_dev;
+
 	char packagename[128];
-	if (strcmp(vendor, "GenuineIntel") == 0) {
+	if (strcmp(vendor, "GenuineIntel") == 0)
 		if (family == 6)
-			switch (model) {
-			case 0x1A:	/* Core i7, Xeon 5500 series */
-			case 0x1E:	/* Core i7 and i5 Processor - Lynnfield Jasper Forest */
-			case 0x1F:	/* Core i7 and i5 Processor - Nehalem */
-			case 0x2E:	/* Nehalem-EX Xeon */
-			case 0x2F:	/* Westmere-EX Xeon */
-			case 0x25:	/* Westmere */
-			case 0x27:	/* Medfield Atom*/
-			case 0x2C:	/* Westmere */
-				ret = new class nhm_package;
-				break;
-			case 0x2A:	/* SNB */
-			case 0x2D:	/* SNB Xeon */
-			case 0x3A:      /* IVB */
-			case 0x3C:
-			case 0x3D:      /* IVB Xeon */
-				has_c2c7_res = 1;
-				ret = new class nhm_package;
-				break;
-			}
-	}
+			if (is_supported_intel_cpu(model))
+				ret = new class nhm_package(model);
 
 	if (!ret)
 		ret = new class cpu_package;
@@ -94,6 +80,17 @@ static class abstract_cpu * new_package(int package, int cpu, char * vendor, int
 	sprintf(packagename, _("cpu package %i"), cpu);
 	cpudev = new class cpudevice(_("cpu package"), packagename, ret);
 	all_devices.push_back(cpudev);
+
+	sprintf(packagename, _("cpu rapl package %i"), cpu);
+	cpu_rapl_dev = new class cpu_rapl_device(cpudev, _("cpu rapl package"), packagename, ret);
+	if (cpu_rapl_dev->device_present())
+		all_devices.push_back(cpu_rapl_dev);
+
+	sprintf(packagename, _("dram rapl package %i"), cpu);
+	dram_rapl_dev = new class dram_rapl_device(cpudev, _("dram rapl package"), packagename, ret);
+	if (dram_rapl_dev->device_present())
+		all_devices.push_back(dram_rapl_dev);
+
 	return ret;
 }
 
@@ -101,24 +98,10 @@ static class abstract_cpu * new_core(int core, int cpu, char * vendor, int famil
 {
 	class abstract_cpu *ret = NULL;
 
-	if (strcmp(vendor, "GenuineIntel") == 0) {
+	if (strcmp(vendor, "GenuineIntel") == 0)
 		if (family == 6)
-			switch (model) {
-			case 0x1A:	/* Core i7, Xeon 5500 series */
-			case 0x1E:	/* Core i7 and i5 Processor - Lynnfield Jasper Forest */
-			case 0x1F:	/* Core i7 and i5 Processor - Nehalem */
-			case 0x2E:	/* Nehalem-EX Xeon */
-			case 0x2F:	/* Westmere-EX Xeon */
-			case 0x25:	/* Westmere */
-			case 0x2C:	/* Westmere */
-			case 0x2A:	/* SNB */
-			case 0x2D:	/* SNB Xeon */
-			case 0x3A:      /* IVB */
-			case 0x3C:
-			case 0x3D:      /* IVB Xeon */
-				ret = new class nhm_core;
-			}
-	}
+			if (is_supported_intel_cpu(model))
+				ret = new class nhm_core(model);
 
 	if (!ret)
 		ret = new class cpu_core;
@@ -144,24 +127,10 @@ static class abstract_cpu * new_cpu(int number, char * vendor, int family, int m
 {
 	class abstract_cpu * ret = NULL;
 
-	if (strcmp(vendor, "GenuineIntel") == 0) {
+	if (strcmp(vendor, "GenuineIntel") == 0)
 		if (family == 6)
-			switch (model) {
-			case 0x1A:	/* Core i7, Xeon 5500 series */
-			case 0x1E:	/* Core i7 and i5 Processor - Lynnfield Jasper Forest */
-			case 0x1F:	/* Core i7 and i5 Processor - Nehalem */
-			case 0x2E:	/* Nehalem-EX Xeon */
-			case 0x2F:	/* Westmere-EX Xeon */
-			case 0x25:	/* Westmere */
-			case 0x2C:	/* Westmere */
-			case 0x2A:	/* SNB */
-			case 0x2D:	/* SNB Xeon */
-			case 0x3A:      /* IVB */
-			case 0x3C:
-			case 0x3D:      /* IVB Xeon */
+			if (is_supported_intel_cpu(model))
 				ret = new class nhm_cpu;
-			}
-	}
 
 	if (!ret)
 		ret = new class cpu_linux;
@@ -399,20 +368,64 @@ static const char * fill_state_line(class abstract_cpu *acpu, int state, int lin
 	return "-EINVAL";
 }
 
+static int get_cstates_num(void)
+{
+	unsigned int package, core, cpu;
+	class abstract_cpu *_package, * _core, * _cpu;
+	unsigned int i;
+	int cstates_num;
+
+	for (package = 0, cstates_num = 0;
+			package < system_level.children.size(); package++) {
+		_package = system_level.children[package];
+		if (_package == NULL)
+			continue;
+
+		/* walk package cstates and get largest cstates number */
+		for (i = 0; i < _package->cstates.size(); i++)
+			cstates_num = std::max(cstates_num,
+						(_package->cstates[i])->line_level);
+
+		/*
+		 * for each core in this package, walk core cstates and get
+		 * largest cstates number
+		 */
+		for (core = 0; core < _package->children.size(); core++) {
+			_core = _package->children[core];
+			if (_core == NULL)
+				continue;
+
+			for (i = 0; i <  _core->cstates.size(); i++)
+				cstates_num = std::max(cstates_num,
+						(_core->cstates[i])->line_level);
+
+			/*
+			 * for each core, walk the logical cpus in case
+			 * there is are more linux cstates than hw cstates
+			 */
+			 for (cpu = 0; cpu < _core->children.size(); cpu++) {
+				_cpu = _core->children[cpu];
+				if (_cpu == NULL)
+					continue;
+
+				for (i = 0; i < _cpu->cstates.size(); i++)
+					cstates_num = std::max(cstates_num,
+						(_cpu->cstates[i])->line_level);
+			}
+		}
+	}
+
+	return cstates_num;
+}
+
 void report_display_cpu_cstates(void)
 {
 	char buffer[512], buffer2[512];
 	unsigned int package, core, cpu;
 	int line, cstates_num;
 	class abstract_cpu *_package, * _core, * _cpu;
-	unsigned int i, j;
 
-	for (i = 0, cstates_num = 0; i < all_cpus.size(); i++) {
-		if (all_cpus[i])
-			for (j = 0; j < all_cpus[i]->cstates.size(); j++)
-				cstates_num = std::max(cstates_num,
-						(all_cpus[i]->cstates[j])->line_level);
-	}
+	cstates_num = get_cstates_num();
 
 	report.begin_section(SECTION_CPUIDLE);
 	report.add_header("Processor Idle state report");
@@ -641,17 +654,15 @@ void impl_w_display_cpu_states(int state)
 	int line, loop, cstates_num, pstates_num;
 	class abstract_cpu *_package, * _core, * _cpu;
 	int ctr = 0;
-	unsigned int i, j;
+	unsigned int i;
 
-	for (i = 0, cstates_num = 0, pstates_num = 0; i < all_cpus.size(); i++) {
+	cstates_num = get_cstates_num();
+
+	for (i = 0, pstates_num = 0; i < all_cpus.size(); i++) {
 		if (!all_cpus[i])
 			continue;
 
 		pstates_num = std::max<int>(pstates_num, all_cpus[i]->pstates.size());
-
-		for (j = 0; j < all_cpus[i]->cstates.size(); j++)
-			cstates_num = std::max(cstates_num,
-						(all_cpus[i]->cstates[j])->line_level);
 	}
 
 	if (state == PSTATE) {
@@ -797,7 +808,7 @@ void perf_power_bundle::handle_trace_point(void *trace, int cpunr, uint64_t time
                         exit(-1);
                 }
 
-		if (val == 4294967295)
+		if (val == (unsigned int)-1)
 			cpu->go_unidle(time);
 		else
 			cpu->go_idle(time);
