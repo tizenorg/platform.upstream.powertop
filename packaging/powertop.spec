@@ -9,7 +9,6 @@ Source0:        https://01.org/powertop/sites/default/files/downloads/%{name}-%{
 Source1001:     %{name}.manifest
 BuildRequires:  gettext
 BuildRequires:  pkgconfig(libnl-1)
-BuildRequires:  pkgconfig(libpci)
 BuildRequires:  pkgconfig(ncurses)
 BuildRequires:  pkgconfig(zlib)
 
