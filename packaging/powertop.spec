@@ -8,7 +8,7 @@ Group:          System/Utilities
 Source0:        https://01.org/powertop/sites/default/files/downloads/%{name}-%{version}.tar.gz
 Source1001:     %{name}.manifest
 BuildRequires:  gettext
-BuildRequires:  pkgconfig(libnl-1)
+BuildRequires:  pkgconfig(libnl-2.0)
 BuildRequires:  pkgconfig(ncurses)
 BuildRequires:  pkgconfig(zlib)
 
